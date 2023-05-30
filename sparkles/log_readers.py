@@ -6,6 +6,8 @@ import pandas as pd
 from astropy.io import fits
 import re
 
+#### MAKING a dataframe from telem/log ####
+
 def make_teldump_df(file_teldump):
     # define a dataframe with columns
     file = open(file_teldump,'r')
