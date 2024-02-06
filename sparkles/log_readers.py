@@ -6,6 +6,8 @@ import pandas as pd
 from astropy.io import fits
 import re
 
+from sparkles.file_reader import *
+
 #### MAKING a dataframe from telem/log ####
 
 def make_teldump_df(file_teldump):
@@ -65,7 +67,7 @@ def make_teldump_csv(file_teldump, new_file=""):
 def query_teldump_csv(file_teldump, date_time_q):
     # taking a csv file and query with a datetime string
     df_dump = pd.read_csv(file_teldump)
-    print(df_dump)
+    #print(df_dump)
     idx_time = df_dump.UT.searchsorted(date_time_q)
     df_time = df_dump.iloc[[idx_time]]
     #return to dict
@@ -78,19 +80,12 @@ def query_teldump_csv_selfRM(self_RM_file, file_teldump):
         print(self_RM_file, e)
         return pd.DataFrame()
     date_time_q = hdr['DATE']
-    return query_teldump_csv(file_teldump, date_time_q)
-    
-def get_hdr_from_file(file):
-    hdul = fits.open(file)
-    hdr = hdul[0].header
-    hdul.close()
-    return hdr
-
-def print_sparkle_params(param_dict):
-    for key in param_dict:
-        print(key, ":" , param_dict[key], " " ,end = '\t')
-    print('\b')
-    return param_dict
+    try:
+        result = query_teldump_csv(file_teldump, date_time_q)
+    except Exception as e:
+        print(self_RM_file, e)
+        return pd.DataFrame()
+    return result
 
 def make_dimm_df(file_dimmdump):
     # define a dataframe with columns
