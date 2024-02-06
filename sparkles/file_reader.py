@@ -92,6 +92,7 @@ def print_sparkle_params(param_dict):
     for key in param_dict:
         print(key, ":" , param_dict[key], "  " ,end = '')
     print('\b')
+    return param_dict
 
 def get_Hz(dir):
     """ Pulling the frequency from the fiven directory """
@@ -109,10 +110,17 @@ def get_datetime_start(dir):
 def get_spark_params_selfRM(selfRM_f, log_csv):
     hdr = get_hdr_from_file(selfRM_f)
     date_rm = hdr['DATE']
+    print(date_rm)
     return get_spark_params_date(date_rm, log_csv)
 
 def get_spark_params_date(date, log_csv):
-    df_check = pd.read_csv(log_csv)
-    idx_time = df_check.UT.searchsorted(date)
-    df_time = df_check.iloc[[idx_time]]
-    return df_time.to_numpy()[0]
+    try:
+        df_check = pd.read_csv(log_csv)
+        idx_time = df_check.UT.searchsorted(date)
+        df_time = df_check.iloc[[idx_time]]
+        return df_time.to_numpy()[0]
+    except Exception as e:
+        print("error: ", e)
+        #returning the first index
+        df_time = df_check.iloc[[-1]]
+        return df_time.to_numpy()[0] 

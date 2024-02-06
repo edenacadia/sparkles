@@ -1,8 +1,8 @@
 # pipeline.py
 # Eden McEwen
 # this file contains the scripts to run to reduce data in a Spark obj
-from Spark import *
-from file_reader import *
+from sparkles.spark import *
+from sparkles.file_reader import *
 
 #run the pool and save the data
 def pipe_main(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark, mask=glob_mask, ref=glob_ref):
@@ -25,6 +25,7 @@ def pipe_main(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark, mask
             data_splits_list.append(data_split_s)
         except Exception as e:
             print(f"We had an error at file {ni}!")
+            print(e)
             continue
         print(f"=> END: Block {n}")
 
@@ -55,6 +56,7 @@ def pipe_all_chunk(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark,
             data_splits_list.append(data_split_s)
         except Exception as e:
             print(f"We had an error at file {ni}!")
+            print(e)
             continue
         print(f"=> END: Block {n}")
 
@@ -83,6 +85,7 @@ def pipe_sky_chunk(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark,
             data_splits_list.append(data_split_s)
         except Exception as e:
             print(f"We had an error at file {ni}!")
+            print(e)
             continue
         print(f"=> END: Block {n}")
 
@@ -122,6 +125,7 @@ def lab_archive(dir_lab, dir_calib=glob_dir_calib, dark=glob_dark, mask=glob_mas
             data_splits_list.append(data_split_s)
         except Exception as e:
             print(f"We had an error at file {ni}!")
+            print(e)
             continue
         print(f"=> END: Block {n}")
 
