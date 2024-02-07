@@ -117,3 +117,7 @@ def make_dimm_csv(file_dimmdump, new_file=""):
     df.to_csv(new_file,  index=False)
     # return the name of wher
     return new_file
+
+def make_holoop_df(txt_holoop):
+    # TODO
+    return None
