@@ -116,3 +116,19 @@ def seeing_to_r_o(seeing, lam_seeing=550):
     as_factor = 1/206265
     r_o = (0.98*lam_seeing*1e-9) / (as_factor*seeing)
     return r_o
+
+def el_scaling_DIMM(el, DIMM):
+    # change elevation to zenith
+    z = 90 - el 
+    # take this as an angle
+    c_mod_ro = (np.cos(np.deg2rad(z)))**(3/5)
+    # turn DIMM to r_o
+    ro = seeing_to_r_o(DIMM)
+    # take this coefficient, turn into 
+    ro_mod = ro*c_mod_ro
+    # convert back for dimm
+    DIMM_mod = ro_to_seeing(ro_mod)
+    # print intermediate
+    #print(f'z: {z}, \n c_mod_ro: {c_mod_ro}, \n ro_mod: {ro_mod}, \n DIMM: {DIMM}, \n DIMM_mod: {DIMM_mod}')
+    # return the modifed  DIMM
+    return DIMM_mod
