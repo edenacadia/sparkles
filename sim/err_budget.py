@@ -7,18 +7,19 @@ import functools
 def calc_strehl(s_mag=5, r_o=0.16, n_act = 1564 , Hz = 2000, rms_jitter = 0, v_wind=10, OG=1):
     # Inputs that are mostly constant:
     t_int = 1/Hz
-    t_s_lag = 0.005 #s usually 10 time control loop speed, control bandwidth
+    t_s_lag = 0.00075 + t_int #s usually 10 time control loop speed, control bandwidth
     D_tel=6.5
-    n_act_acr = n_act**(1/2)
-    lam_ro = 550 #nm
+    lam_ro = 500 #nm
     lam_wave = 810 # nm
     ang_zenith = 0 #ang
     # Caluclations
-    airmass = 1 / np.cos(ang_zenith * np.pi / 180)
+    airmass = 1 / np.cos(ang_zenith * np.pi / 180) # r_o comes pre scaled, not updating 
     seeing_550 = 0.1/r_o
-    ro_scaled = r_o * (lam_wave / lam_ro)**(5/3) * airmass**(-3/5)
+    ro_scaled = r_o * (lam_wave / lam_ro)**(6/5) * airmass**(-3/5)
     D_div_ro = D_tel / ro_scaled
     frq_GW = 0.43 * v_wind / ro_scaled
+    # actuator spacing
+    n_act_acr = n_act**(1/2)
     act_acr_ap = 2*np.sqrt(n_act/np.pi)
     act_spacing = D_tel / act_acr_ap
     # magnitude calc
@@ -41,8 +42,8 @@ def calc_strehl(s_mag=5, r_o=0.16, n_act = 1564 , Hz = 2000, rms_jitter = 0, v_w
 
 def calc_strehl_iter(s_mag=5, r_o=0.16, n_act=1600, Hz=2000, rms_jitter=0, v_wind=15):
     # thee might need to be 
-    iter_limit = 10
-    d_strehl_limit = 0.001
+    iter_limit = 2
+    d_strehl_limit = 0.01
     # for each iteration, use strehl from previouss
     old_strehl = 1 # shart by assuming no strehl issue
     strehl_diff = 1
@@ -61,6 +62,7 @@ def calc_strehl_iter(s_mag=5, r_o=0.16, n_act=1600, Hz=2000, rms_jitter=0, v_win
 
 # Error Fitting
 def calc_err_fit_rad(act_space, ro_scaled):
+    # 0.28 continuous phase sheet
     err = 0.28 * (act_space / ro_scaled)**(5/3)
     return err**0.5
 
@@ -70,7 +72,8 @@ def calc_err_fit_nm(act_space, ro_scaled, lam_wave):
 
 # Error temporal
 def calc_err_temp_rad(t_s_lag, f_o):
-    err = (t_s_lag*f_o)**(5/3)
+    t_o = 0.134 / f_o # Fried 1990
+    err = (t_s_lag/t_o)**(5/3)
     return err**0.5
 
 def calc_err_temp_nm(t_s_lag, t_o, lam_wave):
@@ -81,7 +84,7 @@ def calc_err_temp_nm(t_s_lag, t_o, lam_wave):
 def calc_err_phot_rad(n_act, phot_flux, OG=1):
     # extra beta_p term from pywfs term
     beta_p = 2*np.sqrt(2) / np.sqrt(OG)
-    err = beta_p * n_act / phot_flux
+    err = beta_p**2 * n_act / phot_flux
     return err**0.5
 
 def calc_err_phot_nm(n_act, phot_flux, lam_wave, OG=1):
