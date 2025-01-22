@@ -22,6 +22,7 @@ def calc_strehl(s_mag=5, r_o=0.16, n_act = 1564 , Hz = 2000, rms_jitter = 0, v_w
     n_act_acr = n_act**(1/2)
     act_acr_ap = 2*np.sqrt(n_act/np.pi)
     act_spacing = D_tel / act_acr_ap
+   
     # magnitude calc
     mag0_flux = 452 # p / cm^2 / s / Ang
     area = (D_tel*100)**2 * np.pi / 4 #cm^2
@@ -34,10 +35,13 @@ def calc_strehl(s_mag=5, r_o=0.16, n_act = 1564 , Hz = 2000, rms_jitter = 0, v_w
     err_fit_rad = calc_err_fit_rad(act_spacing, ro_scaled)
     err_temp_rad = calc_err_temp_rad(t_s_lag, frq_GW)
     err_phot_rad = calc_err_phot_rad(n_act, phot_flux, OG=OG)
+    # what's going on here
+    #print(f"MAG {s_mag} r {r_o:0.4} and ro_scaled {ro_scaled:0.4} ")
+    #print(f"fit {err_fit_rad:0.3} temp {err_temp_rad:0.3} phot {err_phot_rad:0.3}")
     # calc Strehl from rad err
     err_tot_sq = err_fit_rad**2 + err_temp_rad**2 + err_phot_rad**2
     strehl = np.exp(-err_tot_sq)
-    strehl_tt = calc_strehl_tt(rms_jitter, D_tel, lam_wave)
+    strehl_tt = 1 #calc_strehl_tt(rms_jitter, D_tel, lam_wave) # not using rn
     return strehl*strehl_tt
 
 def calc_strehl_iter(s_mag=5, r_o=0.16, n_act=1600, Hz=2000, rms_jitter=0, v_wind=15):
@@ -58,7 +62,6 @@ def calc_strehl_iter(s_mag=5, r_o=0.16, n_act=1600, Hz=2000, rms_jitter=0, v_win
         k += 1
         #print(f'iter {k}: Strehl {new_strehl}, diff {strehl_diff}')
     return new_strehl
-
 
 # Error Fitting
 def calc_err_fit_rad(act_space, ro_scaled):
@@ -109,13 +112,13 @@ def calc_strehl_tt(rms_jitter, D_tel, lam_wave):
 def ro_to_seeing_dumb(r_o):
     return 0.1/r_o
 
-def ro_to_seeing(r_o, lamda=550):
+def ro_to_seeing(r_o, lamda=500):
     seeing_rad = 0.98*lamda*1e-9/r_o
     factor_as = 60*60*180/(np.pi) 
     factor = 206265
     return seeing_rad*factor
 
-def seeing_to_r_o(seeing, lam_seeing=550):
+def seeing_to_r_o(seeing, lam_seeing=500):
     as_factor = 1/206265
     r_o = (0.98*lam_seeing*1e-9) / (as_factor*seeing)
     return r_o
@@ -135,3 +138,10 @@ def el_scaling_DIMM(el, DIMM):
     #print(f'z: {z}, \n c_mod_ro: {c_mod_ro}, \n ro_mod: {ro_mod}, \n DIMM: {DIMM}, \n DIMM_mod: {DIMM_mod}')
     # return the modifed  DIMM
     return DIMM_mod
+
+def opt_modes(s_mag, r_o, Hz, v_wind):
+    modes = np.arange(0, 1564)
+    SR_list = [calc_strehl(r_o = r_o, n_act = m, s_mag = s_mag, Hz=Hz, v_wind=v_wind) for m in modes]
+    SR = np.max(SR_list)
+    n_mode = np.argmax(SR_list)
+    return  SR, n_mode
