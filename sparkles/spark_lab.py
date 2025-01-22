@@ -87,10 +87,13 @@ def proc_lab_data_roll(spkl_obj, lab_dir, filename = "syncspark", workers=20, fp
     return data_roll_stack
 
 # plotting the results of reducing data
-def plot_time_series(data_split_stack, file_loc, plot_name, hz = 2000, total_s = -1):
+def plot_time_series(data_split_stack, file_loc, plot_name, hz = 2000, total_s = -1, params=True):
     #using the file directory to pull 
-    spark_params = spkl.get_spark_params(file_loc)
-    spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
+    if params == True:
+        spark_params = spkl.get_spark_params(file_loc)
+        spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
+    else:
+        spark_param_print = ' '
     # set up plot
     colors = pl.cm.tab20(np.arange(4))
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(12,3), facecolor='white', sharex=True)
@@ -139,11 +142,13 @@ def plot_time_series_smoothed(data_split_stack, file_loc, plot_name, n_avg = 100
 
 ## ROLLED DATA
 
-def plot_time_series_roll(data_roll_stack, file_loc, plot_name, n_avg = 1000, hz = 2000, total_s = -1):
+def plot_time_series_roll(data_roll_stack, file_loc, plot_name, n_avg = 1000, hz = 2000, total_s = -1, params=True):
     #using the file directory to pull 
-    spark_params = spkl.get_spark_params(file_loc)
-    spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
-    
+    if params == True:
+        spark_params = spkl.get_spark_params(file_loc)
+        spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
+    else:
+        spark_param_print = ' '
     #generating t axis 
     frame_n = data_roll_stack.shape[2]
     if total_s == -1:
@@ -164,11 +169,13 @@ def plot_time_series_roll(data_roll_stack, file_loc, plot_name, n_avg = 1000, hz
     plt.xlabel('seconds (s)')
     return plt
 
-def plot_time_series_roll_smoothed(data_roll_stack, file_loc, plot_name, n_avg = 1000, hz = 2000, total_s = -1):
+def plot_time_series_roll_smoothed(data_roll_stack, file_loc, plot_name, n_avg = 1000, hz = 2000, total_s = -1, params=True):
     #using the file directory to pull 
-    spark_params = spkl.get_spark_params(file_loc)
-    spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
-    
+    if params == True:
+        spark_params = spkl.get_spark_params(file_loc)
+        spark_param_print = " ".join([key + ':'+ str(spark_params[key]) + "," for key in spark_params])
+    else:
+        spark_param_print = ' '
     #generating t axis 
     frame_n = data_roll_stack.shape[2]
     if total_s == -1:

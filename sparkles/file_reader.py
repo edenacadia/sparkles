@@ -17,18 +17,18 @@ def file_sample(file, path):
     #check to make sure path exists
     if not os.path.isfile(f_all):
         print(f"WARNING! {f_all} not found")
-        return None, None, None
+        return None
     # Open file
     try:
         with fits.open(f_all) as hdul:
-            frame = hdul[0].header['FRAMENO']
-            wrt = hdul[0].header['WRTSEC'] + hdul[0].header['WRTNSEC']*10**(-9)
+            #frame = hdul[0].header['FRAMENO']
+            #wrt = hdul[0].header['WRTSEC'] + hdul[0].header['WRTNSEC']*10**(-9)
             data = hdul[0].data
     except Exception as e:
         print(f"WARNING! {e}")
-        return None, None, None
+        return None
     # Return other metrics
-    return data, frame, wrt
+    return data
 
 def file_lister(file_path):
     """

@@ -83,6 +83,7 @@ class Spark(object):
         ref_self_dot_avg = self.gen_dot_lab_avgs(split_data_roll(np.array(ref_self_dot)))
         self.ref_avg = ref_self_dot_avg
         #TODO: Check to make sure this is continuos 
+    
         return mean_splts_sub, mean_splts_arr_norm, frame_ar, wrt_ar
     
     def set_lab_ref(self, n_lab = 100, n_start = 0):
@@ -319,6 +320,28 @@ class Spark(object):
         
 ########## CALC HELPER FUNCTIONS ##########
 
+def file_sample(file, path):
+    """
+    Take file name, pull, sample value, return
+    """
+    f_all = path + file
+    # check to make sure path exists
+    if not os.path.isfile(f_all):
+        print(f"WARNING! {f_all} not found")
+        return None, None, None
+    # Open file
+    try:
+        with fits.open(f_all) as hdul:
+            frame = hdul[0].header['FRAMENO']
+            wrt = hdul[0].header['WRTSEC'] + hdul[0].header['WRTNSEC']*10**(-9)
+            data = hdul[0].data
+    except Exception as e:
+        print(f"WARNING! {e}")
+        return None, None, None
+    # Return other metrics
+    return data, frame, wrt
+
+
 def split_data(data_cube):
     arr_s1 = data_cube[::4,:,:]
     arr_s2 = data_cube[1::4,:,:]
@@ -344,7 +367,7 @@ def return_rolling(dot_mat, n=100):
     dot_stds = moving_stdv(dot_mat, n=n)
     return dot_avgs, dot_stds
 
-def file_lister(file_path):
+def file_lister(file_path, file_start = 'camwfs'):
     """
     File lister
     takes in: 
@@ -357,7 +380,7 @@ def file_lister(file_path):
     #if not os.path.ispath(file_path):
     #    return False
     # Collect all the files in the directory
-    dir_list = glob.glob("camwfs*.fits", root_dir=file_path)
+    dir_list = glob.glob(f"{file_start}*.fits", root_dir=file_path)
     # check that it found files
     if not dir_list:
         return False

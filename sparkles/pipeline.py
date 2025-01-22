@@ -49,7 +49,7 @@ def pipe_all_chunk(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark,
 
     for n in range(len(f_list_data)//int(sp_data.data_HZ*60)):
         ni = int(n*sp_data.data_HZ*60)
-        chunk_n = int(sp_data.data_HZ/4)
+        chunk_n = int(sp_data.data_HZ/4)    
         print(f"START: Block {n} starting with file {ni}!")
         try:
             data_split_s = np.array(sp_data.dot_chunk_pool(chunk_n, 60, n_start=ni, n_workers=15))
