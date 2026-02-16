@@ -103,3 +103,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 .vscode
+plots/sRM/*
+plots/*
+
+# saved numpy files
+*.npy
