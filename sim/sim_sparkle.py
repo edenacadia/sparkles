@@ -126,63 +126,8 @@ def create_int_mat():
     #TODO: make the interaction matrix for non-modulated
     return
 
-def create_int_mat_mod(deformable_mirror, wf, mpwfs):
-    # using a deformable mirror, iterating through each mode and
-    # recording the 
-    probe_amp = 20e-9 #MAGAOX is in SURFACE #0.01 * wavelength_wfs
-    slopes = []
-    num_modes = deformable_mirror.num_actuators
-    #iterate over the modes
-    for ind in range(num_modes):
-        if ind % 10 == 0:
-            print("Measure response to mode {:d} / {:d}".format(ind+1, num_modes))
-        slope = 0
-        deformable_mirror.flatten()
-        for s in [1, -1]:
-            # setting the DM mirrors
-            deformable_mirror.actuators[ind] += s * probe_amp
-            # forwarding the wfs through the dm
-            dm_wf = deformable_mirror.forward(wf)
-            # MODULATION: use the mod pywfs
-            mwfs_wf = mpwfs.forward(dm_wf)
-            # MODULATION: use the modulation forwarding
-            image = mod_forward_int(mwfs_wf)
-            #show the differences in the slope
-            slope += s * (image)/(2 * probe_amp)
-
-            deformable_mirror.actuators[ind] -= s * probe_amp
-        slopes.append(slope)
-    #slopes = np.array(slopes).T
-    slopes = ModeBasis(slopes)
-    return slopes
-
-def save_int_mat_fits(slopes, modebasis, file_name = "int_mat.fits"):
-    # Setting up Primary
-    hdr = fits.Header()
-    hdr['BASIS'] = (modebasis, 'control mode basis') # expecting string
-    hdr['MODES'] = (slopes.shape[0], 'number of control modes')
-    hdr['WFSWL'] = (wavelength_wfs, 'Wavefront sensor wavelength (m)')
-    hdr['DTEL'] = (telescope_diameter, 'Telescope diameter (m)')
-    hdr['RES'] = (spatial_resolution, 'lambda/D')
-    hdr['MOD'] = (pyramid_modulation , 'Pyramid modulateion : n * lamb /D')
-    hdr['NPIXPUPIL'] = (num_pupil_pixels, 'Number of Pupil Pixels')
-    hdr['NPIXTEL']  = (modulation, 'Num of pupil telescope pixels')
-    hdr['NACT'] = (num_actuators_across_pupil, 'Number of DM actuators')
-    primary_hdu = fits.PrimaryHDU(header=hdr)
-    hdl_list = [primary_hdu]
-    ##### set up data headers
-    hdr = fits.Header()
-    image_hdu = fits.ImageHDU(header=hdr)
-    hdl_list.append(image_hdu)
-    ## saving fits file
-    hdul = fits.HDUList(hdl_list)
-    hdul.writeto(out_file, overwrite=True)
-    return fits_name
-
-def create_int_mat_mod_normed(deformable_mirror, wf, mpwfs):
-    # using a deformable mirror, iterating through each mode and
-    # recording the 
-    probe_amp = 20e-9 #MAGAOX is in SURFACE #0.01 * wavelength_wfs
+def create_int_mat_mod(deformable_mirror, wf, mpwfs, image_ref):
+    probe_amp = 0.01 * wavelength_wfs
     slopes = []
     num_modes = deformable_mirror.num_actuators
     #iterate over the modes
