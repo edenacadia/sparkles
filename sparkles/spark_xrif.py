@@ -19,7 +19,7 @@ import datetime
 import fixr
 import lookyloo
 from lookyloo.core import get_matching_paths
-from xrif_pull import *
+from sparkles.xrif_pull import *
 
 glob_dir_calib = '/home/eden/data/calib/'
 glob_dark = 'camwfs-dark_bin2_2000.000000_600.000000_-45.000000__T20220422005142597501326.fits'
