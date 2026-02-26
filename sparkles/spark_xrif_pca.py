@@ -36,16 +36,17 @@ class SparkXrif(object):
     Hz = 2000
     n_pool = 4
 
-    def __init__(self, sky_obs_name, lab_obs_name, p_dark_s, 
-                 p_dark_l, dir_calib, file_mask, n_avg=10000):
+    def __init__(self, p_dark_s, p_dark_l, 
+                 dir_calib, file_mask, n_avg=10000):
+        # Change in behavior: JUst setting up darks and calibrations here
         # setting up file references
-        self.sky_obs_name = sky_obs_name
-        self.lab_obs_name = lab_obs_name
+        #self.sky_obs_name = sky_obs_name
+        #self.lab_obs_name = lab_obs_name
         self.dir_calib  = dir_calib
-        self.dt_start = dt_start
+        #self.dt_start = dt_start
         #saving the file names that correspond to this 
         self.p_dark_s = p_dark_s
-        self.p_dark_s = p_dark_l
+        self.p_dark_l = p_dark_l
         self.f_mask = file_mask
         self.n_avg = n_avg
         # Saving the data to reference later
@@ -63,19 +64,27 @@ class SparkXrif(object):
         #self.gen_lab_ref()
         return 
     
-    def set_data(self, dt_start=datetime.datetime(2025, 4, 1, tzinfo=datetime.timezone.utc), 
+    def set_data(self, sky_obs_name, lab_obs_name, 
+                 sky_dt_start=datetime.datetime(2025, 4, 1, tzinfo=datetime.timezone.utc), 
+                 lab_dt_start=datetime.datetime(2025, 4, 1, tzinfo=datetime.timezone.utc), 
                  sky_obs_n=0, lab_obs_n=0):
         """
         Changing the behavior so that 
         """
-        self.dt_start = dt_start
+        self.sky_obs_name = sky_obs_name
+        self.lab_obs_name = lab_obs_name
+        self.sky_dt_start = sky_dt_start
+        self.lab_dt_start = lab_dt_start
         self.sky_obs_n = sky_obs_n
         self.lab_obs_n = lab_obs_n
-        self.sky_obs_span = verify_obs(self.sky_obs_name, self.dt_start, n=sky_obs_n) 
-        self.lab_obs_span = verify_obs(self.lab_obs_name, self.dt_start, n= lab_obs_n)
+        self.sky_obs_span = verify_obs(sky_obs_name, sky_dt_start, n=sky_obs_n) 
+        self.lab_obs_span = verify_obs(lab_obs_name, lab_dt_start, n=lab_obs_n)
+        print(self.lab_obs_span)
         self.check_datasets()
+
         # setting None for specific check
         self.gen_lab_ref()
+        return
     
     
     def check_datasets(self, fsize=512):
@@ -140,7 +149,7 @@ class SparkXrif(object):
         # reshaping 
         reference = data_ar.reshape(data_ar.shape[0], data_ar.shape[1]*data_ar.shape[2])
         # project each frame onto PCA basis
-        projection = np.array([self.Z_KL.T @ ref for ref in reference])
+        projection = np.array([self.ref_pca.T @ ref for ref in reference])
         return projection
     
     ################### file sampling ###################
@@ -217,23 +226,26 @@ class SparkXrif(object):
             print(f'chunksize={n_tasks_per_chunk}, n_workers={len(pool._pool)}')
             results = pool.map(self.proj_xfile, f_list[n_start_x:n_end_x], chunksize=n_tasks_per_chunk)
         # return the dot products:
-        dot_results = np.vstack([r[0] for r in results])
+        dot_results = np.vstack(results)
         return dot_results
 
-    ####################### normalize data by lab returns #######################
+####################### normalize data by lab returns #######################
 
-    def proj_norm(self, data_proj):
-        """
-        Take in a data array, normalize by the lab_projections
-        This is dependent on roll, so we will have 4 options for each PCA basis, per frame
-        data_proj: [N, klip]
-        data_proj_norm: [N, klip, 4] 
-        """
-        
-    def proj_rms(self, data_proj, rms_n=100):
-        """
-        This compares the RMS between lab and sky projections, picked with 
-        """
+def proj_norm(data_proj, lab_norm):
+    """
+    Take in a data array, normalize by the lab_projections
+    This is dependent on roll, so we will have 4 options for each PCA basis, per frame
+    data_proj: [N, klip]
+    data_proj_norm: [N, klip, 4] 
+    """
+    n = data_proj.shape[0]
+    extended_norm = np.array([np.repeat(lab_norm[:,i].reshape(1,4), (n//4 +1), axis=0).flatten()[:n] for i in range(3)]).T
+
+    
+def proj_rms(data_proj, rms_n=100):
+    """
+    This compares the RMS between lab and sky projections, picked with 
+    """
 
 ############ General looky loo xrif pulls ####################
 
@@ -307,7 +319,7 @@ def gen_file_list(obs_span, device = 'camwfs'):
     datetime_newer = obs_span.begin
     datetime_older = obs_span.end
     # checking the files associated with
-    glob_data_p_dev = glob_data_p + device + '/'
+    glob_data_p_dev = glob_data_p / device 
     obs_file_list = lookyloo.core.get_matching_paths(glob_data_p_dev, device, extension, datetime_newer, datetime_older)
     return sorted(obs_file_list, key=lambda obs: obs.timestamp)
 
