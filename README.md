@@ -24,4 +24,8 @@ This package contains admittedly too much code surrounding sensing the amplitude
 
 ## Sparkles 
 
-    These set of files 
+    These set of files assist in calculating the optical gain from sparkles. These take in an observation and pull data from xrif files given the start and stop time for that observation. 
+
+    `data_calib.py` - this repeats functionality for the calibrator but with given observations. 
+
+    `data_proc.py` - this uses the calibration files in processing those files to find projections onto the sparkle PCA basis. 
