@@ -1,7 +1,7 @@
 # pca_pipeline
 # 2/25/2026
 # written so I can run pca scripts independently
-import sparkles.spark_xrif_pca as spca
+import code.sparkles.sparkles.data_Proc as spca
 import datetime
 import re
 
