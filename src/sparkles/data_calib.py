@@ -12,13 +12,14 @@ import datetime
 import fixr
 import re
 import sparkles.display as spdisp
+from sparkles.constants import DATA_PATH, DEFAULT_CALIB_DIR, GLOB_MASK, TELEM_PATH
 
 
-glob_data_p = pathlib.Path('/data/rawimages/')
-glob_telem_p = pathlib.Path('/srv/aoc/opt/MagAOX')
+glob_data_p = pathlib.Path(DATA_PATH)
+glob_telem_p = pathlib.Path(TELEM_PATH)
 
-glob_dir_calib = '/home/eden/data/calib/'
-glob_mask = 'aol1_wfsmask.fits'
+glob_dir_calib = DEFAULT_CALIB_DIR + '/'
+glob_mask = GLOB_MASK
 
 import sparkles.file_read as fr 
 import sparkles.pca as pca 

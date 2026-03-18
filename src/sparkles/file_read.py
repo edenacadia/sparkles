@@ -6,10 +6,10 @@ import fixr
 import lookyloo
 import numpy as np
 from lookyloo.core import get_matching_paths
+from sparkles.constants import DATA_PATH, TELEM_PATH
 
-# TODO: put this in a config file
-glob_data_p = pathlib.Path('/data/rawimages/')
-glob_telem_p = pathlib.Path('/srv/aoc/opt/MagAOX')
+glob_data_p = pathlib.Path(DATA_PATH)
+glob_telem_p = pathlib.Path(TELEM_PATH)
 
 ####### file pulling - only relevand for pulling observations
 

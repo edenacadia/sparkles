@@ -18,18 +18,19 @@ import numpy as np
 import pathlib
 # Special joseph additions
 from lookyloo.core import get_matching_paths
+from sparkles.constants import DATA_PATH, DEFAULT_CALIB_DIR, GLOB_MASK, GLOB_REF, TELEM_PATH
 
 # sparkle package files
 import sparkles.file_read as fr 
 import sparkles.pca as pca 
 
-glob_dir_calib = '/home/eden/data/calib/'
+glob_dir_calib = DEFAULT_CALIB_DIR + '/'
 glob_dark = 'camwfs-dark_bin2_2000.000000_600.000000_-45.000000__T20220422005142597501326.fits'
-glob_mask = 'aol1_wfsmask.fits'
-glob_ref = 'aol1_wfsref.fits'
-# to be sent to lookyloo scrips
-glob_data_p = pathlib.Path('/data/rawimages/')
-glob_telem_p = pathlib.Path('/srv/aoc/opt/MagAOX')
+glob_mask = GLOB_MASK
+glob_ref = GLOB_REF
+# to be sent to lookyloo scripts
+glob_data_p = pathlib.Path(DATA_PATH)
+glob_telem_p = pathlib.Path(TELEM_PATH)
 
 class SparkXrif(object):
     Hz = 2000

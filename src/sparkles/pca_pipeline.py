@@ -4,6 +4,8 @@
 import code.sparkles.sparkles.data_Proc as spca
 import datetime
 import re
+from pathlib import Path
+from sparkles.constants import DEFAULT_DARK_DIR
 
 def dir_to_lookyloo(obs_str, target_name="beta_pic"):
     # searching for the lookyloo format
@@ -26,9 +28,9 @@ def dir_to_lookyloo(obs_str, target_name="beta_pic"):
 
 
 def run_main(obs_str_test, lab_str_test, redu_saves):
-    dark_dir = '/opt/MagAOX/calib/camwfs-dark/'
-    lab_dark = dark_dir + 'camwfs-dark_bin2_2000.000000_10.000000_-45.000000__T20240330051127513106835.fits'
-    sky_dark = dark_dir + 'camwfs-dark_bin2_1800.000000_600.000000_-45.000000__T20240324234326026219038.fits'
+    dark_dir = Path(DEFAULT_DARK_DIR)
+    lab_dark = str(dark_dir / 'camwfs-dark_bin2_2000.000000_10.000000_-45.000000__T20240330051127513106835.fits')
+    sky_dark = str(dark_dir / 'camwfs-dark_bin2_1800.000000_600.000000_-45.000000__T20240324234326026219038.fits')
     # disect strings
     obs_str_test = "2025-12-03_052203_beta_pic_piaa"
     sky_dt, sky_obs = dir_to_lookyloo(obs_str_test)

@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
+from sparkles.constants import DEFAULT_DARK_DIR as DEFAULT_DARK_DIR_STR
 
-DEFAULT_DARK_DIR = Path("/opt/MagAOX/calib/camwfs-dark")
+DEFAULT_DARK_DIR = Path(DEFAULT_DARK_DIR_STR)
 TS_RE = re.compile(r"__T(\d{14})(\d*)")
 
 
