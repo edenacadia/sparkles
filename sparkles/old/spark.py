@@ -15,7 +15,7 @@ import multiprocessing as mp
 import numpy as np
 import os
 
-from sparkles.file_reader import *
+from code.sparkles.sparkles.old.file_reader import *
 
 glob_dir_calib = '/home/eden/data/calib/'
 glob_mask = 'aol1_wfsmask.fits'

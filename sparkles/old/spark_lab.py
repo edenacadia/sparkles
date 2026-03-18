@@ -12,8 +12,8 @@ from scipy.optimize import curve_fit
 import pandas as pd
 import matplotlib.pylab as pl
 # super special:
-import sparkles.spark as spkl
-import sparkles.spark_plots as sp
+import code.sparkles.sparkles.old.spark as spkl
+import code.sparkles.sparkles.old.spark_plots as sp
 
 
 # function that processess fits and saves the time series dot product as npy 

@@ -1,8 +1,8 @@
 # pipeline.py
 # Eden McEwen
 # this file contains the scripts to run to reduce data in a Spark obj
-from sparkles.spark import *
-from sparkles.file_reader import *
+from code.sparkles.sparkles.old.spark import *
+from code.sparkles.sparkles.old.file_reader import *
 
 #run the pool and save the data
 def pipe_main(data_dir, lab_data, dir_calib=glob_dir_calib, dark=glob_dark, mask=glob_mask, ref=glob_ref):

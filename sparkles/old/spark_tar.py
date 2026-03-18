@@ -15,7 +15,7 @@ import os
 import tarfile
 
 #from sparkles.file_reader import * # these assume not tar
-from sparkles.spark import Spark
+from code.sparkles.sparkles.old.spark import Spark
 
 glob_dir_calib = '../data/calib/'
 glob_mask = 'aol1_wfsmask.fits'

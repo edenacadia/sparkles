@@ -6,7 +6,7 @@ import pandas as pd
 from astropy.io import fits
 import re
 
-from sparkles.file_reader import *
+from code.sparkles.sparkles.old.file_reader import *
 
 #### MAKING a dataframe from telem/log ####
 

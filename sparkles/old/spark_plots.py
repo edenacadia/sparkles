@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from astropy.io import fits
 import numpy as np
 
-from sparkles.file_reader import *
+from code.sparkles.sparkles.old.file_reader import *
 
 def plot_selfRM_gains(sky_selfRM, lab_selfRM, title = '', RM_dir = "/home/eden/data/self_RMs/"):
     selfRM_sky = fits.open(RM_dir + sky_selfRM)[0].data
