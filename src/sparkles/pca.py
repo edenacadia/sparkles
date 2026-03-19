@@ -2,12 +2,15 @@ import numpy as np
 
 def pca_basis(data_ar, klip=3):
     # need to delete the mean here:
-    data_ar = data_ar - np.average(data_ar, axis=0)
+    # TODO: Double check to see if this needs to be over all frames or per frame
+    #data_ar = data_ar - np.average(data_ar, axis=0)
     # generate a PCA basis from these files
     K, x, y = data_ar.shape
     N = x*y
     image_shape = (x, y)
     reference_lab = data_ar.reshape(K, N)
+    # Mean sub - each frame has a mean of zero
+    reference_lab = reference_lab - np.average(reference_lab, axis=1, keepdims=True)
     # calc covariance
     E = np.cov(reference_lab) * (N - 1)
     # find eigenvalues and eigenvectors
