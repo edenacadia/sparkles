@@ -32,13 +32,13 @@ def calib_folder_name(sep: float, ang: float, amp: float, freq: float) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Iterate through sparkle parameter combinations and run calibrate()."
+        description="Iterate through sparkle parameter combinations and save/process."
     )
     parser.add_argument(
         "--cores",
         type=int,
         default=None,
-        help="Limit CPU cores/threads for each calibration run.",
+        help="Limit CPU cores/threads for processing runs.",
     )
     parser.add_argument(
         "--calib-dir",
@@ -48,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print all combinations without executing calibrations.",
+        help="Print all combinations without executing runs.",
     )
     parser.add_argument(
         "--stop-on-error",
@@ -59,18 +59,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--freq",
         type=float,
         default=2000.0,
-        help="Frequency used in output folder naming (default: 2000).",
+        help="Frequency used for folder naming/lookups (default: 2000).",
     )
     parser.add_argument(
         "--force-rerun",
         action="store_true",
-        help="Run calibration even if output folder already exists.",
+        help="Run even if outputs for that combination already exist.",
+    )
+    parser.add_argument(
+        "--save-only",
+        action="store_true",
+        help="Run only the data-saving stage for each combo.",
+    )
+    parser.add_argument(
+        "--process-only",
+        action="store_true",
+        help="Run only the processing stage for each combo.",
     )
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.save_only and args.process_only:
+        raise SystemExit("Use only one of --save-only or --process-only.")
+
+    do_save = not args.process_only
+    do_process = not args.save_only
 
     combos = build_grid(
         separations=DEFAULT_SEPARATIONS,
@@ -92,12 +107,29 @@ def main() -> int:
 
     failures = []
     skipped = []
+
+    spark_saver = None
+    if do_save and not args.dry_run:
+        import spark_save as ss
+
+        spark_saver = ss.SparkSave()
+        spark_saver.setup(args.calib_dir)
+
     for i, (sep, ang, amp) in enumerate(combos, start=1):
         folder = calib_root / calib_folder_name(sep, ang, amp, args.freq)
-        if folder.exists() and not args.force_rerun:
-            print(f"\n[{i:03d}/{total:03d}] Skipping existing: {folder}")
-            skipped.append((sep, ang, amp, str(folder)))
-            continue
+        if not args.force_rerun:
+            if do_save and folder.exists():
+                print(f"\n[{i:03d}/{total:03d}] Skipping existing save folder: {folder}")
+                skipped.append((sep, ang, amp, str(folder)))
+                continue
+            if do_process:
+                ref_pca = folder / "ref_pca.fits"
+                ref_proj = folder / "ref_proj.fits"
+                ref_rms = folder / "ref_rms.fits"
+                if ref_pca.exists() and ref_proj.exists() and ref_rms.exists():
+                    print(f"\n[{i:03d}/{total:03d}] Skipping existing processed outputs: {folder}")
+                    skipped.append((sep, ang, amp, str(folder)))
+                    continue
 
         print(f"\n[{i:03d}/{total:03d}] Running sep={sep}, ang={ang}, amp={amp}")
         try:
@@ -105,6 +137,10 @@ def main() -> int:
                 sparkle_params=[sep, ang, amp],
                 n_cores=args.cores,
                 calibration_folder=args.calib_dir,
+                do_save=do_save,
+                do_process=do_process,
+                spark_saver=spark_saver,
+                process_freq=args.freq,
             )
             print(f"[{i:03d}/{total:03d}] OK")
         except Exception as exc:
