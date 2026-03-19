@@ -118,18 +118,25 @@ def main() -> int:
     for i, (sep, ang, amp) in enumerate(combos, start=1):
         folder = calib_root / calib_folder_name(sep, ang, amp, args.freq)
         if not args.force_rerun:
-            if do_save and folder.exists():
-                print(f"\n[{i:03d}/{total:03d}] Skipping existing save folder: {folder}")
+            savedata_exists = (folder / "savedata.txt").exists()
+            metadata_exists = (folder / "metadata.txt").exists()
+
+            if do_save and do_process and savedata_exists and metadata_exists:
+                print(
+                    f"\n[{i:03d}/{total:03d}] Skipping existing save+process outputs: {folder}"
+                )
                 skipped.append((sep, ang, amp, str(folder)))
                 continue
-            if do_process:
-                ref_pca = folder / "ref_pca.fits"
-                ref_proj = folder / "ref_proj.fits"
-                ref_rms = folder / "ref_rms.fits"
-                if ref_pca.exists() and ref_proj.exists() and ref_rms.exists():
-                    print(f"\n[{i:03d}/{total:03d}] Skipping existing processed outputs: {folder}")
-                    skipped.append((sep, ang, amp, str(folder)))
-                    continue
+            if do_save and not do_process and savedata_exists:
+                print(f"\n[{i:03d}/{total:03d}] Skipping existing saved run: {folder}")
+                skipped.append((sep, ang, amp, str(folder)))
+                continue
+            if do_process and not do_save and metadata_exists:
+                print(
+                    f"\n[{i:03d}/{total:03d}] Skipping existing calibration run: {folder}"
+                )
+                skipped.append((sep, ang, amp, str(folder)))
+                continue
 
         print(f"\n[{i:03d}/{total:03d}] Running sep={sep}, ang={ang}, amp={amp}")
         try:

@@ -69,7 +69,7 @@ class SparkCalib():
         # grab that stack of frames, with the dark subtracted
         data = self.grab_cube()
         # generate the PCA basis, and the self reference
-        self.n_pca = np.min([self.n_frames_total, self.n_frames])
+        self.n_pca = np.min([self.n_frames_total, self.n_pca_max])
         self.gen_lab_ref(data, n_pca=self.n_pca)
         # save the PCA basis and self reference to the save directory
         self.save_reference()
@@ -90,14 +90,19 @@ class SparkCalib():
             return False
         
     def read_savedata(self):
+        self.savedata = {}
         with open(self.savedata_path, "r") as fh:
             for line in fh:
-                if line.startswith("#"):
+                line = line.strip()
+                if not line or line.startswith("#"):
                     continue
-                key, value = line.strip().split(":")
-                self.metadata[key] = value
-        self.ts_start = datetime.datetime.strptime(self.metadata['ts_start'], FILE_FORMAT)
-        self.ts_end = datetime.datetime.strptime(self.metadata['ts_end'], FILE_FORMAT)
+                key, value = line.split(":", 1)
+                self.savedata[key.strip()] = value.strip()
+        self.ts_start = datetime.datetime.strptime(self.savedata['ts_start'], FILE_FORMAT)
+        self.ts_end = datetime.datetime.strptime(self.savedata['ts_end'], FILE_FORMAT)
+        # Persisted during save stage; needed when writing calibration metadata.
+        self.dwell = self.savedata.get('SPK_dwell', 0)
+        self.delay = self.savedata.get('SPK_delay', 0)
         return
 
     def grab_cube(self):
@@ -168,7 +173,6 @@ class SparkCalib():
         return Z_KL, Z_KL_img, lab_avgs
     
     def save_reference(self):
-        self.check_calib_dir()
         self.metadata = self._get_save_metadata()
         # Using the save function to have all these saved
         self.save_fits(self.ref_pca, f"{self.calib_path}/ref_pca.fits")
