@@ -25,10 +25,6 @@ import pathlib
 
 import sys
 from pathlib import Path
-# repo root that contains the `sparkles/` package folder
-repo_root = Path("/home/eden/code/sparkles")
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
 
 from sparkles import pca
 
@@ -64,8 +60,9 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         self.log = logging.getLogger(self.__class__.__name__)
 
     def setup(self, dir_spark_calib, n_frames=4000):
-        self.dir_spark_calib  = dir_spark_calib #TODO: make a more permanent location
-        # TODO: does XDevice auto connect to a client? is that why we use it?
+        #TODO: make a more permanent location
+        self.dir_spark_calib  = dir_spark_calib 
+        # These are the number of frames wewant to take when starting the program
         self.n_frames = n_frames
         # Re-assert logger for defensive safety if __init__ is bypassed.
         if not hasattr(self, "log"):
@@ -122,7 +119,8 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         # grab that stack of frames, with the dark subtracted
         data = self.grab_cube()
         # generate the PCA basis, and the self reference
-        self.gen_lab_ref(data)
+        self.n_pca = np.min([self.n_frames_total, self.n_frames])
+        self.gen_lab_ref(data, n_pca=self.n_pca)
         # save the PCA basis and self reference to the save directory
         self.save_reference()
         return
@@ -158,6 +156,7 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         # send those xrif files to the pull
         data_conglom = [self.pull_file_xrif(file)[0] for file in xrif_files]
         data_stack = np.vstack(data_conglom)
+        self.n_frames_total = data_stack.shape[0]
         # stack into one cube
         return data_stack
 
@@ -194,14 +193,14 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         n_files = int(data.size / 120 / 120)
         return np.reshape(data, (n_files,120,120)), np.reshape(timing, (n_files,5))
 
-    def gen_lab_ref(self, data, klip=3):
+    def gen_lab_ref(self, data, n_pca=1000, klip=3):
         """ 
         Pull a bunch of files, take an average
         """
         print("GENERATING REFERENCE PCA basis")
-        #TODO: this darta pull probably needs to get cleaned, which requires a mask...
+        print(f"Using {n_pca} frames out of {data.shape[0]}")
         # creating the PCA basis
-        Z_KL, Z_KL_img = pca.pca_basis(data, klip=klip)
+        Z_KL, Z_KL_img = pca.pca_basis(data[:n_pca,:,:], klip=klip)
         self.ref_pca = Z_KL
         self.ref_pca_img = Z_KL_img
         # Then, we're going to create a self reference, for each roll. 
@@ -286,7 +285,9 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
             'WFS_hz': self.freq,
             'SPK_dwell': self.dwell,
             'SPK_delay': self.delay,
-            'n_files': getattr(self, 'n_files', -1),
+            'n_files': self.n_files,
+            'n_frames_total': self.n_frames_total,
+            'n_pca': self.n_pca,
             'ts_start': self.ts_start.strftime(FILE_FORMAT),
             'ts_end': self.ts_end.strftime(FILE_FORMAT),
         }
@@ -314,6 +315,8 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         hdu.header['SPK_dwll'] = metadata['SPK_dwell']
         hdu.header['SPK_dlay'] = metadata['SPK_delay']
         hdu.header['n_files'] = metadata['n_files']
+        hdu.header['n_frames'] = metadata['n_frames_total']
+        hdu.header['n_pca'] = metadata['n_pca']
         hdu.header['ts_start'] = metadata['ts_start']
         hdu.header['ts_end'] = metadata['ts_end']
         # saving and overwriting if needed
