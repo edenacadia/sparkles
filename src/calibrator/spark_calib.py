@@ -38,69 +38,24 @@ FILE_FORMAT = "%Y%m%d%H%M%S%f000"
 DATA_PATH = pathlib.Path(f"/opt/MagAOX/rawimages/{STREAM_WRITER_NAME}/")
 CHILE_TZ = ZoneInfo("America/Santiago")
 
-@xconf.config
-class CameraConfig:
-    """
-    """
-    shmim : str = xconf.field(help="Name of the camera device (specifically, the associated shmim, if different)")
-    dark_shmim : str = xconf.field(help="Name of the dark frame shmim associated with this camera device")
-    #TODO: Does camtip have a dark frame?
 
-@xconf.config
-class sparkCalibConfig(BaseConfig):
-    """ Configure  """
-    # if want default need to be a cam config obj
-    camera : CameraConfig = xconf.field(help="Camera to use")
+class SparkCalib(): 
 
-class SparkCalib(): # not sure yet if I need to make this an XDevice... 
-    config: sparkCalibConfig
-
-    def __init__(self):
-        # This class can run standalone (outside XDevice), so create a logger here.
-        self.log = logging.getLogger(self.__class__.__name__)
-
-    def setup(self, dir_spark_calib, n_frames=4000):
+    def setup(self, dir_spark_calib, sep, ang, amp, freq, n_pca_max=4000):
         #TODO: make a more permanent location
         self.dir_spark_calib  = dir_spark_calib 
         # These are the number of frames wewant to take when starting the program
-        self.n_frames = n_frames
-        # Re-assert logger for defensive safety if __init__ is bypassed.
-        if not hasattr(self, "log"):
-            self.log = logging.getLogger(self.__class__.__name__)
-        self.client = indi.client.IndiClient()
-        self.client.connect()
-        self.client.get_properties(['tweeterSpeck', STREAM_WRITER_NAME+'-sw'])
-        self.wait_for_required_properties()
-        return
-
-    def wait_for_required_properties(self, timeout_s=10.0, poll_s=0.1):
-        """
-        Wait for required INDI properties to appear before continuing.
-        get_properties() subscriptions are asynchronous.
-        """
-        required_props = [
-            'tweeterSpeck.modulating.toggle',
-            f'{STREAM_WRITER_NAME}-sw.writing.toggle',
-            f'{STREAM_WRITER_NAME}-sw.fsm.state',
-        ]
-        t0 = time.time()
-        missing = list(required_props)
-        while time.time() - t0 < timeout_s:
-            missing = []
-            for prop in required_props:
-                try:
-                    _ = self.client[prop]
-                except KeyError:
-                    missing.append(prop)
-            if not missing:
-                print(f"INDI properties ready: {', '.join(required_props)}")
-                return
-            time.sleep(poll_s)
-
-        raise RuntimeError(
-            "Timed out waiting for required INDI properties: "
-            + ", ".join(missing)
-        )
+        self.n_pca_max = n_pca_max
+        # these are the sparkle parameters
+        self.sep = sep
+        self.ang = ang
+        self.amp = amp
+        self.freq = freq
+        # make sure we have a directory for the parameters, 
+        # without that we don't have save data to pull
+        if not self.check_save_dir():
+            return False
+        return True
 
     def calibrate(self):
         """ Main function
@@ -109,13 +64,8 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         3. Generate the PCA basis, and the self norm
         4. Save the PCA basis and self norm to the save directory
         """
-        # check the sparkle params, update save directory
-        if not self.checkParams():
-            print("WARNING: Sparkle params are not set correctly, calibrating with current params")
-        # check to make sure directory exists, if not, make it 
-        self.check_calib_dir()
-        # start logging, saving from streamwriter
-        self.save_cube()
+        # Once calibrating, read in the metadata to get 
+        self.read_savedata()
         # grab that stack of frames, with the dark subtracted
         data = self.grab_cube()
         # generate the PCA basis, and the self reference
@@ -125,29 +75,30 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         self.save_reference()
         return
 
-    def save_cube(self):
-        """ Toggle the stream writers, save the start/stop times"""
-        # Now save the datetime 
-        self.ts_start = datetime.datetime.now(CHILE_TZ).astimezone(datetime.timezone.utc)
-        self.client[f'{STREAM_WRITER_NAME}-sw.writing.toggle'] = indi.ON
-        # Waiting for confirmation before storing time. 
-        counter = 0
-        while self.client[f'{STREAM_WRITER_NAME}-sw.fsm.state'] != 'OPERATING': 
-            counter += 1
-            time.sleep(0.01)
-            if counter > 100:
-                print("WARNING: Camera stream is not writing after 1 seconds, check the camera and the stream writer")
-                return
-        # some kind of wait 4 seconds or whatever
-        #time.sleep(4) #TODO: hardcode this or make it a config
-        dt = self.n_frames/self.freq
-        print(f"Waiting for {dt} seconds")
-        time.sleep(dt)
-        # and the toggle the streamwriter 
-        self.client[f'{STREAM_WRITER_NAME}-sw.writing.toggle'] = indi.OFF
-        self.ts_end = datetime.datetime.now(CHILE_TZ).astimezone(datetime.timezone.utc)
-        # and then save when we turn it off 
-        return 
+    def check_save_dir(self):
+        self.calib_folder = f"sep{int(self.sep):02d}_ang{int(self.ang):02d}_amp{self.amp:01.3f}_freq{int(self.freq):02d}"
+        self.calib_path = f"{self.dir_spark_calib}/{self.calib_folder}"
+        self.savedata_path = f"{self.calib_path}/savedata.txt"
+        if pathlib.Path(self.calib_path).exists():
+            print(f"Path exists: {self.calib_path}")
+            if not pathlib.Path(self.savedata_path).exists():
+                print(f"Savedata file does not exist, EXIT")
+                return False
+            return True
+        else:
+            print(f"Directory does not exist, EXIT")
+            return False
+        
+    def read_savedata(self):
+        with open(self.savedata_path, "r") as fh:
+            for line in fh:
+                if line.startswith("#"):
+                    continue
+                key, value = line.strip().split(":")
+                self.metadata[key] = value
+        self.ts_start = datetime.datetime.strptime(self.metadata['ts_start'], FILE_FORMAT)
+        self.ts_end = datetime.datetime.strptime(self.metadata['ts_end'], FILE_FORMAT)
+        return
 
     def grab_cube(self):
         # you have to have taken the data first
@@ -215,56 +166,6 @@ class SparkCalib(): # not sure yet if I need to make this an XDevice...
         self.ref_rms = lab_rms
         # shape: [klip]
         return Z_KL, Z_KL_img, lab_avgs
-    
-    def checkParams(self):
-        """ Check the sparkle params, update sparkle save directory """
-        self.sep = self.client['tweeterSpeck.separation.current']
-        self.ang = self.client['tweeterSpeck.angle.current']
-        self.amp = self.client['tweeterSpeck.amp.current']
-        self.freq = self.client['tweeterSpeck.frequency.current']
-        # make the folder for saving the sparkle data. 
-        self.calib_folder = f"sep{int(self.sep):02d}_ang{int(self.ang):02d}_amp{self.amp:01.3f}_freq{int(self.freq):02d}"
-        print("Updated save location: {:s}".format(self.calib_folder))
-        # check to see if these are in the default state
-        self.dwell = self.client['tweeterSpeck.dwell.current']
-        self.delay = self.client['tweeterSpeck.delay.current']
-        self.trigger = self.client['tweeterSpeck.trigger.toggle']
-        # check to see if they're modulating, if not, warning 
-        mod = self.client['tweeterSpeck.modulating.toggle']
-        if mod == indi.SwitchState.OFF:
-            #self.log.warning("Sparkle is not modulating")
-            print("Sparkle is not modulating")
-            return False
-        if self.dwell > 1: 
-            print(f"WARNING: we are dwelling {self.frames} frames")
-        if self.delay > 0:
-            print(f"WARNING: we are delaying for {self.delay} frames")
-        if self.trigger == indi.SwitchState.OFF:
-            print("WARNING: we are not triggering on the modulator")
-        return True
-
-    def setParams(self, sep, ang, amp):
-        # turn off, then back on again: 
-        self.client['tweeterSpeck.modulating.toggle'] =  indi.SwitchState.OFF
-        # Setting the sparkle params
-        self.client['tweeterSpeck.separation.target'] = sep
-        self.client['tweeterSpeck.angle.target'] = ang
-        self.client['tweeterSpeck.amp.target'] = amp
-        time.sleep(1)
-        # turn sparkles back on
-        self.client['tweeterSpeck.modulating.toggle'] = indi.SwitchState.ON
-        time.sleep(1)
-        # Calling the check params to make sure that these are applied
-        return self.checkParams()
-
-    def check_calib_dir(self):
-        self.calib_path = f"{self.dir_spark_calib}/{self.calib_folder}"
-        if pathlib.Path(self.calib_path).exists():
-            print(f"Path exists: {self.calib_path}")
-        else:
-            print(f"making directory for this calibration: {self.calib_path}")
-            pathlib.Path(f"{self.calib_path}").mkdir(parents=True, exist_ok=True)
-        return 
     
     def save_reference(self):
         self.check_calib_dir()
