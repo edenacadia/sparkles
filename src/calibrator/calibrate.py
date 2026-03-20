@@ -35,7 +35,8 @@ def calibrate(
     do_save: bool = True,
     do_process: bool = True,
     spark_saver=None,
-    process_freq: float | None = None,
+    process_freq: float | None = 2000.0,
+    dual_save: bool = False,
 ) -> dict[str, object]:
     if not do_save and not do_process:
         raise ValueError("At least one stage must be enabled: save and/or process.")
@@ -48,10 +49,15 @@ def calibrate(
     saver = spark_saver
 
     if do_save:
-        import spark_save as ss
+        if dual_save:
+            import spark_save_dual as ss
+            saver_cls = ss.SparkSaveDual
+        else:
+            import spark_save as ss
+            saver_cls = ss.SparkSave
 
         if saver is None:
-            saver = ss.SparkSave()
+            saver = saver_cls()
             saver.setup(calibration_folder)
         elif not hasattr(saver, "client"):
             # If caller passes a SparkSave that is not initialized yet.
@@ -66,14 +72,19 @@ def calibrate(
             set_thread_limit(n_cores)
 
         # Import after setting env vars so thread limits are respected.
-        import spark_calib as sc
+        if dual_save:
+            import spark_calib_dual as sc
+            calib_cls = sc.SparkCalibDual
+        else:
+            import spark_calib as sc
+            calib_cls = sc.SparkCalib
 
         if freq_used is None:
             raise ValueError(
                 "process_freq is required when running process-only mode."
             )
 
-        cspk = sc.SparkCalib()
+        cspk = calib_cls()
         if not cspk.setup(calibration_folder, sep, ang, amp, freq_used):
             raise RuntimeError(
                 "SparkCalib setup failed. Confirm saved data exists for these params."
@@ -121,8 +132,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--freq",
         type=float,
-        default=None,
-        help="Sparkle frequency used for process-only mode folder lookup.",
+        default=2000.0,
+        help="Sparkle frequency used for process-only mode folder lookup (default: 2000).",
+    )
+    parser.add_argument(
+        "--dual-save",
+        action="store_true",
+        help="Use dual stream save mode (camwfs-sw + aol1_imWFS2-sw).",
     )
     return parser
 
@@ -144,6 +160,7 @@ def main() -> int:
         do_save=do_save,
         do_process=do_process,
         process_freq=args.freq,
+        dual_save=args.dual_save,
     )
     return 0
 

@@ -76,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run only the processing stage for each combo.",
     )
+    parser.add_argument(
+        "--dual-save",
+        action="store_true",
+        help="Use dual stream save mode (camwfs-sw + aol1_imWFS2-sw).",
+    )
     return parser
 
 
@@ -110,9 +115,14 @@ def main() -> int:
 
     spark_saver = None
     if do_save and not args.dry_run:
-        import spark_save as ss
+        if args.dual_save:
+            import spark_save_dual as ss
+            saver_cls = ss.SparkSaveDual
+        else:
+            import spark_save as ss
+            saver_cls = ss.SparkSave
 
-        spark_saver = ss.SparkSave()
+        spark_saver = saver_cls()
         spark_saver.setup(args.calib_dir)
 
     for i, (sep, ang, amp) in enumerate(combos, start=1):
@@ -148,6 +158,7 @@ def main() -> int:
                 do_process=do_process,
                 spark_saver=spark_saver,
                 process_freq=args.freq,
+                dual_save=args.dual_save,
             )
             print(f"[{i:03d}/{total:03d}] OK")
         except Exception as exc:
