@@ -128,26 +128,26 @@ class SparkCalibrate(object):
         hdu.writeto(filename, overwrite=True)
         return
 
-    def file_sample_n_clean(self, file_lists, n, n_start=0, norm=True):
+    def file_sample_n_clean(self, file_lists, n, n_start=0):
         data, timing = fr.pull_n_files(file_lists, n, n_start=n_start)
-        data_clean = self.file_clean(data, norm=norm)
+        data_clean = self.file_clean(data)
         return data_clean, timing
 
-    def file_clean(self, data, norm=True):
+    def file_clean(self, data):
         """ Clean a single file 
         recently removed the ref
         TODO: subtract the average?
         """
         # TODO: make this respond to a loaded dark 
         data_dark_sub = data - self.dark_data
-        # Normalization standard proc.
-        if norm:
-            data_dark_sub_mask = data_dark_sub * self.mask_data
-            data_normed = np.divide(data_dark_sub_mask, np.sum(data_dark_sub_mask)) # this sum should be one 
-            data_return = data_normed
-        else: 
-            data_return = data
-        return data_return
+        # You have to normalize, no options
+        data_dark_sub_mask = data_dark_sub * self.mask_data
+        frame_sums = np.sum(data_dark_sub_mask, axis=(1, 2), keepdims=True)
+        frame_sums = np.where(frame_sums == 0, 1.0, frame_sums)
+        normed_data = data_dark_sub_mask / frame_sums
+        # now subtract the mean frame
+        data_mean_sub = normed_data - np.mean(normed_data, axis=0, keepdims=True)
+        return data_mean_sub
 
     ############## Plots for convenience ##############
     # TODO: make these their own python file

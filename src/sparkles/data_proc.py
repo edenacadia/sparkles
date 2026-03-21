@@ -42,12 +42,12 @@ class SparkXrif(object):
         self.dir_calib  = dir_calib
         self.dir_spark_calib = dir_spark_calib
         # TODO: Update later to query the database 
-        self.spark_sep = spark_sep
-        self.spark_ang = spark_ang
-        self.spark_amp = spark_amp
-        self.wfs_hz = wfs_hz
+        self.sep = spark_sep
+        self.ang = spark_ang
+        self.amp = spark_amp
+        self.freq = wfs_hz
         # Define the calib directories, then look to see if it exits:
-        self.calib_folder = f"sep{spark_sep}_ang{spark_ang}_amp{spark_amp}_freq{wfs_hz}"
+        self.calib_folder = f"sep{int(self.sep):02d}_ang{int(self.ang):02d}_amp{self.amp:01.3f}_freq{int(self.freq):02d}"
         self.calib_path = f"{self.dir_spark_calib}/{self.calib_folder}"
         self.ref_pca, self.ref_rms = self.load_calib(self.calib_path)
         # TODO: one day, automate grabbing the right dark 
@@ -73,6 +73,8 @@ class SparkXrif(object):
         # check if the calibration directory exits
         if pathlib.Path(calib_path).exists():
             data_pca = fits.open(path_pca)[0].data
+            # TODO: this 90 rot might not be appropriate for all cases, need to check
+            data_pca = np.rot90(data_pca, axes=(1,2))
             data_rms = fits.open(path_rms)[0].data
             print("Calibration files found, loading PCA basis and RMS")
             return data_pca, data_rms
@@ -98,42 +100,42 @@ class SparkXrif(object):
     
     ################### file sampling ###################
 
-    def file_sample_n_clean(self, file_lists, n, n_start=0, norm=True, lab=False):
+    def file_sample_n_clean(self, file_lists, n, n_start=0):
         data, timing = fr.pull_n_files(file_lists, n, n_start=n_start)
-        data_clean = self.file_clean(data, norm=norm, lab=lab)
+        data_clean = self.file_clean(data)
         return data_clean, timing
 
-    def xfile_sample_clean(self, p, norm=True, lab=False):
+    def xfile_sample_clean(self, p):
         # collecting many xrif files
         data, t = fr.pull_file_xrif(p) # this is gonna be 512
         # cleaning those files with lab data
-        data_clean = self.file_clean(data, lab=lab)
+        data_clean = self.file_clean(data)
         return data_clean, t
     
-    def file_clean(self, data, norm=True, lab=False):
+    def file_clean(self, data):
         """ Clean a single file 
         recently removed the ref
         TODO: subtract the average?
         """
         # TODO: make this respond to a loaded dark 
         data_dark_sub = data - self.dark_data
-        # Normalization standard proc.
-        if norm:
-            data_dark_sub_mask = data_dark_sub * self.mask_data
-            data_normed = np.divide(data_dark_sub_mask, np.sum(data_dark_sub_mask)) # this sum should be one 
-            data_return = data_normed
-        else: 
-            data_return = data_dark_sub
-        return data_return
+        # You have to normalize, no options
+        data_dark_sub_mask = data_dark_sub * self.mask_data
+        frame_sums = np.sum(data_dark_sub_mask, axis=(1, 2), keepdims=True)
+        frame_sums = np.where(frame_sums == 0, 1.0, frame_sums)
+        normed_data = data_dark_sub_mask / frame_sums
+        # now subtract the mean frame
+        data_mean_sub = normed_data - np.mean(normed_data, axis=0, keepdims=True)
+        return data_mean_sub
 
     ################### process data ###################
 
-    def proj_xfile(self, p, norm=True, lab=False):
+    def proj_xfile(self, p):
         """
         Docstring for proj_xfile
         """
         # pull data. lab indicates what dark to use
-        data_arr, t = self.xfile_sample_clean(p, norm=norm, lab=lab)
+        data_arr, t = self.xfile_sample_clean(p)
         # now each frame should be projected onto the PCA basis
         data_proj = pca.pca_projection(data_arr, self.ref_pca) 
         # first axis file number, second axis PCA return

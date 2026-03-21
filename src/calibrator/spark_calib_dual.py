@@ -58,17 +58,19 @@ class SparkCalibDual:
         self.read_savedata()
         for streamwriter in self.streamwriters:
             print(f"\nProcessing streamwriter: {streamwriter}")
-            data = self.grab_cube(streamwriter)
-            if data.size == 0:
-                raise RuntimeError(f"No frames found for streamwriter: {streamwriter}")
-
-            if streamwriter == "camwfs-sw":
-                data = self.apply_camwfs_clean(data)
-
+            data = self.load_streamwriter_data(streamwriter)
             self.n_pca = int(np.min([self.n_frames_total, self.n_pca_max]))
             self.gen_lab_ref(data, n_pca=self.n_pca)
             self.save_reference(streamwriter)
         return
+
+    def load_streamwriter_data(self, streamwriter: str):
+        data = self.grab_cube(streamwriter)
+        if data.size == 0:
+            raise RuntimeError(f"No frames found for streamwriter: {streamwriter}")
+        if streamwriter == "camwfs-sw":
+            data = self.apply_camwfs_clean(data)
+        return data
 
     def read_savedata(self):
         self.savedata = {}
@@ -165,12 +167,19 @@ class SparkCalibDual:
         dark_match = find_closest_camwfs_dark(self.ts_start)
         self.camwfs_dark_path = str(dark_match.dark_path)
         dark_data = fits.getdata(dark_match.dark_path)
-
+        # dark subtraction
         data_dark_sub = data - dark_data
-        data_dark_sub_mask = data_dark_sub * self.mask_data
-        frame_sums = np.sum(data_dark_sub_mask, axis=(1, 2), keepdims=True)
+        # subtract off the mean per frame, over mask
+        # doing that here made things weird, had more scatter
+        # norm in the mask
+        data_sub_mask = data_dark_sub * self.mask_data
+        frame_sums = np.sum(data_sub_mask, axis=(1, 2), keepdims=True)
         frame_sums = np.where(frame_sums == 0, 1.0, frame_sums)
-        return data_dark_sub_mask / frame_sums
+        normed_data = data_sub_mask / frame_sums
+        # now subtract the mean frame
+        data_mean_sub = normed_data - np.mean(normed_data, axis=0, keepdims=True)
+        
+        return data_mean_sub
 
     def gen_lab_ref(self, data, n_pca=1000, klip=3):
         print("GENERATING REFERENCE PCA basis")
