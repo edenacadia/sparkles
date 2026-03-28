@@ -74,7 +74,7 @@ class SparkXrif(object):
         if pathlib.Path(calib_path).exists():
             data_pca = fits.open(path_pca)[0].data
             # TODO: this 90 rot might not be appropriate for all cases, need to check
-            data_pca = np.rot90(data_pca, axes=(1,2))
+            # data_pca = np.rot90(data_pca, axes=(1,2))
             data_rms = fits.open(path_rms)[0].data
             print("Calibration files found, loading PCA basis and RMS")
             return data_pca, data_rms
@@ -139,7 +139,7 @@ class SparkXrif(object):
         # now each frame should be projected onto the PCA basis
         data_proj = pca.pca_projection(data_arr, self.ref_pca) 
         # first axis file number, second axis PCA return
-        return data_proj
+        return data_proj, t
 
     def proj_pool(self, n_start=0, n=100, n_workers=4):
         """
@@ -159,8 +159,9 @@ class SparkXrif(object):
             print(f'chunksize={n_tasks_per_chunk}, n_workers={len(pool._pool)}')
             results = pool.map(self.proj_xfile, f_list[n_start_x:n_end_x], chunksize=n_tasks_per_chunk)
         # return the dot products:
-        dot_results = np.vstack(results)
-        return dot_results
+        dot_results = np.vstack([r[0] for r in results])
+        t_results = np.vstack([r[1] for r in results])
+        return dot_results, t_results
 
     ####################### normalize data by lab returns #######################
 
@@ -174,6 +175,10 @@ class SparkXrif(object):
             og_all.append(og)
         return np.array(og_all)
 
+    def og_rms_average(self, data_proj, n_rms=100, n_avg=100):
+        # take rms over so many frames, then aevergage. 
+        # reject outliers before returnign 
+        pass
 
 ########## CALC HELPER FUNCTIONS ##########
 
