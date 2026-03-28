@@ -54,9 +54,19 @@ class SparkCalibDual:
         self.streamwriters = []
         return True
 
-    def calibrate(self):
+    def calibrate(self, streamwriters: list[str] | None = None):
         self.read_savedata()
-        for streamwriter in self.streamwriters:
+        if streamwriters is None:
+            active_streamwriters = self.streamwriters
+        else:
+            requested = [sw for sw in streamwriters if sw]
+            active_streamwriters = [sw for sw in requested if sw in self.streamwriters]
+            missing = [sw for sw in requested if sw not in self.streamwriters]
+            if missing:
+                print(f"Requested streamwriters not found in savedata: {missing}")
+        if not active_streamwriters:
+            raise RuntimeError("No streamwriters selected for calibration.")
+        for streamwriter in active_streamwriters:
             print(f"\nProcessing streamwriter: {streamwriter}")
             data = self.load_streamwriter_data(streamwriter)
             self.n_pca = int(np.min([self.n_frames_total, self.n_pca_max]))
