@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
+from pathlib import Path
 from typing import Sequence
 
 CALIBRATION_FOLDER = "/home/eden/data/spark_calib/"
+SPARK_AO_FOLDER = "/home/eden/data/spark_AO"
 
 def set_thread_limit(n_cores: int) -> None:
     """
@@ -101,13 +104,74 @@ def calibrate(
     }
 
 
+def _parse_calib_folder_name(folder_name: str) -> tuple[float, float, float, float]:
+    match = re.fullmatch(
+        r"sep(?P<sep>\d+)_ang(?P<ang>\d+)_amp(?P<amp>\d+(?:\.\d+)?)_freq(?P<freq>\d+(?:\.\d+)?)",
+        folder_name,
+    )
+    if match is None:
+        raise ValueError(f"Unrecognized calibration folder format: {folder_name}")
+    return (
+        float(match.group("sep")),
+        float(match.group("ang")),
+        float(match.group("amp")),
+        float(match.group("freq")),
+    )
+
+
+def recalibrate_all_camwfs(
+    spark_ao_folder: str = SPARK_AO_FOLDER,
+    n_cores: int | None = None,
+    n_pca_max: int = 4000,
+) -> dict[str, object]:
+    """
+    Re-run processing for all camwfs-sw calibration folders under spark_ao_folder.
+    """
+    if n_cores is not None:
+        set_thread_limit(n_cores)
+
+    import spark_calib_dual as sc
+
+    root = Path(spark_ao_folder)
+    if not root.exists():
+        raise FileNotFoundError(f"spark_ao_folder does not exist: {spark_ao_folder}")
+
+    savedata_files = sorted(root.glob("**/savedata.txt"))
+    target_calib_dirs = [p.parent for p in savedata_files if (p.parent / "camwfs-sw").exists()]
+    target_calib_dirs = sorted(set(target_calib_dirs))
+
+    processed = []
+    failures = []
+
+    for calib_dir in target_calib_dirs:
+        try:
+            sep, ang, amp, freq = _parse_calib_folder_name(calib_dir.name)
+            calib_parent = str(calib_dir.parent)
+            cspk = sc.SparkCalibDual()
+            if not cspk.setup(calib_parent, sep, ang, amp, freq, n_pca_max=n_pca_max):
+                raise RuntimeError("SparkCalibDual setup failed for folder.")
+            cspk.calibrate(streamwriters=["camwfs-sw"])
+            processed.append(str(calib_dir))
+        except Exception as exc:  # noqa: BLE001 - keep batch running
+            failures.append({"folder": str(calib_dir), "error": str(exc)})
+
+    return {
+        "root": str(root),
+        "discovered": len(target_calib_dirs),
+        "processed": len(processed),
+        "failed": len(failures),
+        "processed_folders": processed,
+        "failures": failures,
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Save sparkle data and/or process calibration products."
     )
-    parser.add_argument("--sep", type=float, required=True, help="Sparkle separation")
-    parser.add_argument("--ang", type=float, required=True, help="Sparkle angle")
-    parser.add_argument("--amp", type=float, required=True, help="Sparkle amplitude")
+    parser.add_argument("--sep", type=float, help="Sparkle separation")
+    parser.add_argument("--ang", type=float, help="Sparkle angle")
+    parser.add_argument("--amp", type=float, help="Sparkle amplitude")
     parser.add_argument(
         "--cores",
         type=int,
@@ -140,6 +204,25 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use dual stream save mode (camwfs-sw + aol1_imWFS2-sw).",
     )
+    parser.add_argument(
+        "--recalibrate-camwfs-all",
+        action="store_true",
+        help=(
+            "Re-run calibration processing for all camwfs-sw folders found under "
+            "--spark-ao-dir."
+        ),
+    )
+    parser.add_argument(
+        "--spark-ao-dir",
+        default=SPARK_AO_FOLDER,
+        help=f"Root folder to scan in batch camwfs mode (default: {SPARK_AO_FOLDER})",
+    )
+    parser.add_argument(
+        "--n-pca-max",
+        type=int,
+        default=4000,
+        help="Maximum PCA frames for batch camwfs mode (default: 4000).",
+    )
     return parser
 
 
@@ -149,6 +232,30 @@ def main() -> int:
 
     if args.save_only and args.process_only:
         parser.error("Use only one of --save-only or --process-only.")
+
+    if args.recalibrate_camwfs_all:
+        result = recalibrate_all_camwfs(
+            spark_ao_folder=args.spark_ao_dir,
+            n_cores=args.cores,
+            n_pca_max=args.n_pca_max,
+        )
+        print(
+            f"camwfs batch recalibration complete: "
+            f"{result['processed']}/{result['discovered']} processed, "
+            f"{result['failed']} failed"
+        )
+        if result["failures"]:
+            print("Failures:")
+            for item in result["failures"]:
+                print(f" - {item['folder']}: {item['error']}")
+        return 0
+
+    missing = [name for name in ("sep", "ang", "amp") if getattr(args, name) is None]
+    if missing:
+        parser.error(
+            "Missing required arguments for single-run mode: "
+            + ", ".join(f"--{name}" for name in missing)
+        )
 
     do_save = not args.process_only
     do_process = not args.save_only
