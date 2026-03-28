@@ -1,34 +1,108 @@
 # Sparkles
 
-Sparkels are incoherent speckles produced by the DM. They are pairs of delta functions on the focal plane, which correspondingly are sign waves on the pupil plane, as sensed by the WFS. 
+Sparkles are incoherent speckles produced by the DM. They are paired spots in the focal plane (and corresponding sine-wave structure in the pupil/WFS space). This repository contains tools to:
 
-This package contains admittedly too much code surrounding sensing the amplitude of the sparkles relative to lab calibrated sparkles. 
+- save sparkle calibration data
+- process that data into PCA calibration products
+- re-run processing for existing saved calibration folders
 
-## Calibrator
+## Running The Calibrator
 
-The calibration scripts allow `aol1_imWFS2-sw` or the streamwriter that logs the processed camWFS images (dark subtracted, normalized) to be saved with the known sparkle parameters. This is how the basis for each sparkle combination is generated. 
+All commands below are shown from the repository root (`sparkles/`).
 
-Running a single calibration:
+### Single sparkle run (`calibrate.py`)
 
-    python3 sparkles/calibrator/calibrate.py --sep 22 --ang 18 --amp 0.03
+Run save + process in one command:
 
-Running a grid, a large 84 set by default: 
+```bash
+python3 src/calibrator/calibrate.py --sep 22 --ang 18 --amp 0.03
+```
 
-    python3 sparkles/calibrator/calibrate_grid.py
+Run save only:
 
-Options that might be helpful:
+```bash
+python3 src/calibrator/calibrate.py --sep 22 --ang 18 --amp 0.03 --save-only
+```
 
-`--dry-run` for checking what might get run
+Run process only (for existing saved data):
 
-`--cores 4` for specifiying 4 ocres being used, for example
+```bash
+python3 src/calibrator/calibrate.py --sep 22 --ang 18 --amp 0.03 --process-only --freq 2000
+```
 
-`--force-rerun` for repeating created directories
+Use dual-stream save mode (`camwfs-sw + aol1_imWFS2-sw`):
 
+```bash
+python3 src/calibrator/calibrate.py --sep 22 --ang 18 --amp 0.03 --dual-save
+```
 
-## Sparkles 
+### Grid runs (`calibrate_grid.py`)
 
-These set of files assist in calculating the optical gain from sparkles. These take in an observation and pull data from xrif files given the start and stop time for that observation. 
+Run the default parameter grid:
 
-`data_calib.py` - this repeats functionality for the calibrator but with given observations. 
+```bash
+python3 src/calibrator/calibrate_grid.py
+```
 
-`data_proc.py` - this uses the calibration files in processing those files to find projections onto the sparkle PCA basis. 
+Preview what would run without executing:
+
+```bash
+python3 src/calibrator/calibrate_grid.py --dry-run
+```
+
+Force reruns even when outputs already exist:
+
+```bash
+python3 src/calibrator/calibrate_grid.py --force-rerun
+```
+
+Grid save-only or process-only modes:
+
+```bash
+python3 src/calibrator/calibrate_grid.py --save-only
+python3 src/calibrator/calibrate_grid.py --process-only --freq 2000
+```
+
+### Batch reprocess existing camwfs runs
+
+Re-run processing for all folders under a root that contain `savedata.txt` and a `camwfs-sw` directory:
+
+```bash
+python3 src/calibrator/calibrate.py --recalibrate-camwfs-all --spark-ao-dir /home/eden/data/spark_AO
+```
+
+Limit PCA frames used in this batch mode:
+
+```bash
+python3 src/calibrator/calibrate.py --recalibrate-camwfs-all --n-pca-max 4000
+```
+
+## Useful CLI options
+
+`calibrate.py`:
+
+- `--sep`, `--ang`, `--amp`: required for single-run mode
+- `--calib-dir`: calibration output directory (default: `/home/eden/data/spark_calib/`)
+- `--cores`: limit numeric-library thread usage
+- `--save-only` / `--process-only`: run only one stage
+- `--freq`: processing folder lookup frequency (important for process-only mode)
+- `--dual-save`: save both streamwriters
+- `--recalibrate-camwfs-all`: batch reprocess mode
+- `--spark-ao-dir`: root folder for batch mode
+- `--n-pca-max`: max PCA frames in batch mode
+
+`calibrate_grid.py`:
+
+- `--dry-run`: print run/skip status only
+- `--force-rerun`: do not skip existing outputs
+- `--stop-on-error`: stop at first failure
+- `--save-only` / `--process-only`
+- `--dual-save`
+- `--freq`, `--cores`, `--calib-dir`
+
+Use `--help` on either script for the latest full argument list:
+
+```bash
+python3 src/calibrator/calibrate.py --help
+python3 src/calibrator/calibrate_grid.py --help
+```
