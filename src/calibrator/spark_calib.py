@@ -25,7 +25,6 @@ import pathlib
 
 import sys
 from pathlib import Path
-
 from sparkles import pca
 
 # TODO: Need to switch prints to logs
@@ -149,28 +148,55 @@ class SparkCalib():
         n_files = int(data.size / 120 / 120)
         return np.reshape(data, (n_files,120,120)), np.reshape(timing, (n_files,5))
 
-    def gen_lab_ref(self, data, n_pca=1000, klip=3):
+    def gen_lab_ref(self, data, n_pca=1000, klip=3, iter_rms=False):
         """ 
         Pull a bunch of files, take an average
         """
         print("GENERATING REFERENCE PCA basis")
         print(f"Using {n_pca} frames out of {data.shape[0]}")
+
+        if iter_rms:
+            # add extra dimensions to klip 
+            klip_extra = klip + 2
+        else:
+            klip_extra = klip
+
         # creating the PCA basis
-        Z_KL, Z_KL_img = pca.pca_basis(data[:n_pca,:,:], klip=klip)
-        self.ref_pca = Z_KL
-        self.ref_pca_img = Z_KL_img
-        # Then, we're going to create a self reference, for each roll. 
-        lab_proj = pca.pca_projection(data, self.ref_pca) # this is for all frames
+        #Z_KL, Z_KL_img = pca.pca_basis(data[:n_pca,:,:], klip=klip_extra)
+        # slightly faster method for calculating PCA basis
+        Z_KL, Z_KL_img = pca.pca_basis_truc(data[:n_pca,:,:], klip=klip_extra)
+        
+        # A self reference for all frames
+        lab_proj = pca.pca_projection(data, Z_KL)
         # shape: [N, klip]
         # averages by the sparkle pattern
         lab_avgs = np.array([np.mean(lab_proj[i::4,:], axis=0) for i in range(4)])
-        self.ref_proj = lab_avgs
         # shape: [spark, klip]
-        # we will usually use these as a stdv across the time axis
+
+        # RMS for each PCA mode 
         lab_rms = np.std(lab_proj, axis=0)
-        self.ref_rms = lab_rms
+
+        if iter_rms:
+            # sort by rms and see if any of the variation is small
+            rms_sort = np.argsort(-lab_rms)
+            # take the top three modes with the largest rms
+            Z_KL_iter = Z_KL[rms_sort[:klip]]
+            Z_KL_img_iter = Z_KL_img[rms_sort[:klip]]
+            lab_avgs_iter = lab_avgs[rms_sort[:klip]]
+            lab_rms_iter = lab_rms[rms_sort[:klip]]
+        else:
+            Z_KL_iter = Z_KL
+            Z_KL_img_iter = Z_KL_img
+            lab_avgs_iter = lab_avgs
+            lab_rms_iter = lab_rms
+
+        # at this point, sort by rms and see if any of the variation is too small
+        self.ref_pca = Z_KL_iter
+        self.ref_pca_img = Z_KL_img_iter
+        self.ref_proj = lab_avgs_iter
+        self.ref_rms = lab_rms_iter
         # shape: [klip]
-        return Z_KL, Z_KL_img, lab_avgs
+        return Z_KL_iter, Z_KL_img_iter, lab_avgs_iter
     
     def save_reference(self):
         self.metadata = self._get_save_metadata()
