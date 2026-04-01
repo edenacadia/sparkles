@@ -1,16 +1,14 @@
 import numpy as np
+import sklearn
 
 def pca_basis(data_ar, klip=3):
-    # need to delete the mean here:
-    # TODO: Double check to see if this needs to be over all frames or per frame
-    #data_ar = data_ar - np.average(data_ar, axis=0)
+    # We are doing a spatial mean bc we are using a spatial PCA
+    data_ar = data_ar - np.average(data_ar, axis=0)
     # generate a PCA basis from these files
     K, x, y = data_ar.shape
     N = x*y
     image_shape = (x, y)
     reference_lab = data_ar.reshape(K, N)
-    # Mean sub - each frame has a mean of zero
-    reference_lab = reference_lab - np.average(reference_lab, axis=1, keepdims=True)
     # calc covariance
     E = np.cov(reference_lab) * (N - 1)
     # find eigenvalues and eigenvectors
@@ -24,6 +22,17 @@ def pca_basis(data_ar, klip=3):
     Z_KL_lab_images = Z_KL_lab.T.reshape((reference_lab.shape[0],) + image_shape)
     Z_KL_lab_images_truc = Z_KL_lab_images[:klip,:,:]
     return Z_KL_lab_truc, Z_KL_lab_images_truc
+
+def pca_basis_truc(data_ar, klip=3):
+    # this method uses 
+    data = data_ar.reshape(data_ar.shape[0], data_ar.shape[1]*data_ar.shape[2])
+    # we want to only calculate the modes we plan on using 
+    solvr = sklearn.decomposition.PCA(n_components=klip, svd_solver='arpack')
+    solvr.fit(data)
+    Z_KL_lab_truc = solvr.components_
+    Z_KL_lab_images_truc = Z_KL_lab_truc.reshape(klip, data_ar.shape[1], data_ar.shape[2])
+    # and return 
+    return Z_KL_lab_truc.T, Z_KL_lab_images_truc
 
 def pca_projection(data_ar, ref_pca):
     # project each frame of the data onto the PCA basis
