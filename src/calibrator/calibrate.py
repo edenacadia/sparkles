@@ -130,6 +130,28 @@ def recalibrate_all_camwfs(
     if n_cores is not None:
         set_thread_limit(n_cores)
 
+    return recalibrate_all_streamwriter(
+        streamwriter="camwfs-sw",
+        spark_ao_folder=spark_ao_folder,
+        n_cores=n_cores,
+        n_pca_max=n_pca_max,
+    )
+
+
+def recalibrate_all_streamwriter(
+    streamwriter: str,
+    spark_ao_folder: str = SPARK_AO_FOLDER,
+    n_cores: int | None = None,
+    n_pca_max: int = 4000,
+) -> dict[str, object]:
+    """
+    Re-run calibration processing for one streamwriter across all folders under spark_ao_folder.
+    """
+    if not streamwriter:
+        raise ValueError("streamwriter must be a non-empty string.")
+    if n_cores is not None:
+        set_thread_limit(n_cores)
+
     import spark_calib_dual as sc
 
     root = Path(spark_ao_folder)
@@ -137,26 +159,33 @@ def recalibrate_all_camwfs(
         raise FileNotFoundError(f"spark_ao_folder does not exist: {spark_ao_folder}")
 
     savedata_files = sorted(root.glob("**/savedata.txt"))
-    target_calib_dirs = [p.parent for p in savedata_files if (p.parent / "camwfs-sw").exists()]
+    target_calib_dirs = [
+        p.parent for p in savedata_files if (p.parent / streamwriter).exists()
+    ]
     target_calib_dirs = sorted(set(target_calib_dirs))
+    total_targets = len(target_calib_dirs)
 
     processed = []
     failures = []
 
-    for calib_dir in target_calib_dirs:
+    for idx, calib_dir in enumerate(target_calib_dirs, start=1):
+        print(f"[{idx}/{total_targets}] Processing folder: {calib_dir}")
         try:
             sep, ang, amp, freq = _parse_calib_folder_name(calib_dir.name)
             calib_parent = str(calib_dir.parent)
             cspk = sc.SparkCalibDual()
             if not cspk.setup(calib_parent, sep, ang, amp, freq, n_pca_max=n_pca_max):
                 raise RuntimeError("SparkCalibDual setup failed for folder.")
-            cspk.calibrate(streamwriters=["camwfs-sw"])
+            cspk.calibrate(streamwriters=[streamwriter])
             processed.append(str(calib_dir))
+            print(f"[{idx}/{total_targets}] Completed folder: {calib_dir}")
         except Exception as exc:  # noqa: BLE001 - keep batch running
             failures.append({"folder": str(calib_dir), "error": str(exc)})
+            print(f"[{idx}/{total_targets}] Failed folder: {calib_dir} ({exc})")
 
     return {
         "root": str(root),
+        "streamwriter": streamwriter,
         "discovered": len(target_calib_dirs),
         "processed": len(processed),
         "failed": len(failures),
@@ -213,6 +242,22 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--recalibrate-streamwriter-all",
+        action="store_true",
+        help=(
+            "Re-run calibration processing for one streamwriter in every folder under "
+            "--spark-ao-dir that contains that streamwriter subfolder."
+        ),
+    )
+    parser.add_argument(
+        "--streamwriter",
+        default="camwfs-sw",
+        help=(
+            "Streamwriter subfolder name used by --recalibrate-streamwriter-all "
+            "(default: camwfs-sw)."
+        ),
+    )
+    parser.add_argument(
         "--spark-ao-dir",
         default=SPARK_AO_FOLDER,
         help=f"Root folder to scan in batch camwfs mode (default: {SPARK_AO_FOLDER})",
@@ -233,6 +278,9 @@ def main() -> int:
     if args.save_only and args.process_only:
         parser.error("Use only one of --save-only or --process-only.")
 
+    if args.recalibrate_camwfs_all and args.recalibrate_streamwriter_all:
+        parser.error("Use only one of --recalibrate-camwfs-all or --recalibrate-streamwriter-all.")
+
     if args.recalibrate_camwfs_all:
         result = recalibrate_all_camwfs(
             spark_ao_folder=args.spark_ao_dir,
@@ -241,6 +289,24 @@ def main() -> int:
         )
         print(
             f"camwfs batch recalibration complete: "
+            f"{result['processed']}/{result['discovered']} processed, "
+            f"{result['failed']} failed"
+        )
+        if result["failures"]:
+            print("Failures:")
+            for item in result["failures"]:
+                print(f" - {item['folder']}: {item['error']}")
+        return 0
+
+    if args.recalibrate_streamwriter_all:
+        result = recalibrate_all_streamwriter(
+            streamwriter=args.streamwriter,
+            spark_ao_folder=args.spark_ao_dir,
+            n_cores=args.cores,
+            n_pca_max=args.n_pca_max,
+        )
+        print(
+            f"{result['streamwriter']} batch recalibration complete: "
             f"{result['processed']}/{result['discovered']} processed, "
             f"{result['failed']} failed"
         )
