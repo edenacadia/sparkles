@@ -89,7 +89,6 @@ def pull_n_files(file_lists, n, n_start=0, fsize=512):
         data_stack = np.array(data_conglom[0])[n_offset : n_offset + n]
         timing_stack = np.array(timing_conglom[0])[n_offset : n_offset + n]
     print("file n pull", data_stack.shape)
-    #todo: might need resize arrays
     return data_stack, timing_stack
 
 def pull_file_xrif(file_obs, fsize=512):
@@ -102,6 +101,75 @@ def pull_file_xrif(file_obs, fsize=512):
     #TODO: check if this is the right approach
     n_files = int(data.size / 120 / 120)
     return np.reshape(data, (n_files,120,120)),  np.reshape(timing, (n_files,5))
+
+def timing_row_to_datetimes(timing_row):
+    """
+    Convert one timing row of shape [5] into UTC datetimes.
+
+    Expected layout:
+        [frame_index, acq_sec, acq_nsec, write_sec, write_nsec]
+    """
+    if len(timing_row) != 5:
+        raise ValueError(
+            f"Expected 5 timing elements, got {len(timing_row)}: {timing_row!r}"
+        )
+
+    frame_index, acq_sec, acq_nsec, write_sec, write_nsec = [int(x) for x in timing_row]
+
+    acq_dt = datetime.datetime.fromtimestamp(
+        acq_sec, tz=datetime.timezone.utc
+    ) + datetime.timedelta(microseconds=acq_nsec // 1000)
+
+    write_dt = datetime.datetime.fromtimestamp(
+        write_sec, tz=datetime.timezone.utc
+    ) + datetime.timedelta(microseconds=write_nsec // 1000)
+
+    return {
+        "frame_index": frame_index,
+        "acq_datetime": acq_dt,
+        "acq_nsec_remainder": acq_nsec % 1000,
+        "write_datetime": write_dt,
+        "write_nsec_remainder": write_nsec % 1000,
+    }
+
+
+def timing_array_to_datetimes(timing_array):
+    """
+    Convert a timing array of shape [N, 5] into a list of decoded rows.
+    """
+    return [timing_row_to_datetimes(row) for row in timing_array]
+
+
+def parse_sparkle_params_from_test_folder(test_folder):
+    """
+    Parse sparkle parameters from a calibration/test folder name.
+
+    Accepts either a full path or just the folder string, for example:
+    - /home/eden/data/spark_calib/sep22_ang45_amp0.050_freq2000
+    - sep22_ang45_amp0.050_freq2000
+
+    Returns:
+        dict with keys: sep, ang, amp, freq
+    """
+    folder_name = pathlib.Path(test_folder).name
+    match = re.search(
+        r"sep(?P<sep>-?\d+(?:\.\d+)?)_"
+        r"ang(?P<ang>-?\d+(?:\.\d+)?)_"
+        r"amp(?P<amp>-?\d+(?:\.\d+)?)_"
+        r"freq(?P<freq>-?\d+(?:\.\d+)?)",
+        folder_name,
+    )
+    if not match:
+        raise ValueError(
+            f"Could not parse sparkle params from folder name: {test_folder!r}"
+        )
+
+    params = {k: float(v) for k, v in match.groupdict().items()}
+    # Keep these as ints when they are integer-valued.
+    for key in ("sep", "ang", "freq"):
+        if params[key].is_integer():
+            params[key] = int(params[key])
+    return params
 
 
 def dir_to_lookyloo(obs_str, target_name="beta_pic"):
